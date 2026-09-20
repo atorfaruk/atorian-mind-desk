@@ -1,0 +1,111 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0b0f14;
+  color: #e8eef5;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 30px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+header h1 {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+header p {
+  color: #8d99a8;
+  font-size: 16px;
+}
+
+main {
+  max-width: 1100px;
+  margin: auto;
+}
+
+.assistant {
+  background: #111820;
+  border: 1px solid #26313d;
+  border-radius: 16px;
+  padding: 25px;
+  margin-bottom: 25px;
+}
+
+.assistant h2 {
+  margin-top: 0;
+}
+
+textarea {
+  width: 100%;
+  min-height: 100px;
+  margin-top: 15px;
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px solid #344250;
+  background: #0b0f14;
+  color: white;
+  resize: vertical;
+}
+
+button {
+  margin-top: 12px;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 9px;
+  background: #16a36a;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #128957;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.card {
+  background: #111820;
+  border: 1px solid #26313d;
+  border-radius: 16px;
+  padding: 25px;
+  min-height: 150px;
+}
+
+.card h3 {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+.card p {
+  color: #8d99a8;
+}
+
+@media (max-width: 700px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .app {
+    padding: 15px;
+  }
+
+  header h1 {
+    font-size: 30px;
+  }
+}
