@@ -9,7 +9,33 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+const fetchWithRetry = async (url, options) => {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(url, options);
 
+      if (
+        response.ok ||
+        ![429, 500, 502, 503, 504].includes(response.status) ||
+        attempt === 3
+      ) {
+        return response;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * attempt)
+      );
+    } catch (error) {
+      if (attempt === 3) {
+        throw error;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * attempt)
+      );
+    }
+  }
+};
 app.get("/", (req, res) => {
   res.json({ message: "Bitget AI Trading Desk server is running." });
 });
@@ -36,7 +62,7 @@ app.post("/api/analyze", async (req, res) => {
   const { question, market } = req.body;
 
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
       {
         method: "POST",
@@ -91,6 +117,7 @@ res.json({ analysis: text });
     });
   }
 });
+
 app.listen(3001, () => {
   console.log("Server running on http://localhost:3001");
 });

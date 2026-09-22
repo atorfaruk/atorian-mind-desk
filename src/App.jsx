@@ -6,6 +6,7 @@ function App() {
   const [analysis, setAnalysis] = useState("");
   const [market, setMarket] = useState(null);
   const [symbol, setSymbol] = useState("BTCUSDT");
+  const [news, setNews] = useState([]);
   const markets = [
   "BTCUSDT",
   "ETHUSDT",
@@ -36,6 +37,20 @@ function App() {
 
   loadMarket();
 }, [symbol]);
+useEffect(() => {
+  const loadNews = async () => {
+    try {
+      const response = await fetch("http://localhost:3001/api/news");
+      const data = await response.json();
+
+      setNews(data.news || []);
+    } catch (error) {
+      console.error("News error:", error);
+    }
+  };
+
+  loadNews();
+}, []);
 const analyzeMarket = async () => {
   if (!question.trim()) {
     setAnalysis("Please enter a market question first.");
@@ -44,34 +59,58 @@ const analyzeMarket = async () => {
 
   const text = question.toUpperCase();
 
-  const detectedSymbol =
-    markets.find((item) =>
-      text.includes(item.replace("USDT", ""))
-    ) || symbol;
+  const detectedSymbols = markets.filter((item) =>
+    text.includes(item.replace("USDT", ""))
+  );
 
-  setSymbol(detectedSymbol);
+  const symbolsToFetch =
+    detectedSymbols.length > 0 ? detectedSymbols : [symbol];
+
+  setSymbol(symbolsToFetch[0]);
   setAnalysis("AI is analyzing the live market data...");
 
   try {
-    const marketResponse = await fetch(
-      `https://api.bitget.com/api/v3/market/tickers?category=SPOT&symbol=${detectedSymbol}`
+    const marketResults = await Promise.all(
+      symbolsToFetch.map(async (marketSymbol) => {
+        const response = await fetch(
+          `https://api.bitget.com/api/v3/market/tickers?category=SPOT&symbol=${marketSymbol}`
+        );
+
+        const data = await response.json();
+
+        return {
+          symbol: marketSymbol,
+          data: data.data[0],
+        };
+      })
     );
 
-    const marketData = await marketResponse.json();
-    const freshMarket = marketData.data[0];
+    const primaryMarket = marketResults[0].data;
+    setMarket(primaryMarket);
 
-    setMarket(freshMarket);
+    const marketContext =
+      marketResults.length === 1
+        ? primaryMarket
+        : Object.fromEntries(
+            marketResults.map((item) => [
+              item.symbol,
+              item.data,
+            ])
+          );
 
-    const response = await fetch("http://localhost:3001/api/analyze", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question,
-        market: freshMarket,
-      }),
-    });
+    const response = await fetch(
+      "http://localhost:3001/api/analyze",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question,
+          market: marketContext,
+        }),
+      }
+    );
 
     const data = await response.json();
 
@@ -91,13 +130,13 @@ const analyzeMarket = async () => {
   return (
     <div className="app">
       <header>
-        <h1>AI Trading Desk</h1>
+        <h1>Atorian Mind Desk</h1>
         <p>Research smarter. Stress-test decisions. You make the final call.</p>
       </header>
 
       <main>
         <section className="assistant">
-          <h2>🤖 AI Trading Assistant</h2>
+          <h2>🤖 Atorian AI Assistant</h2>
 
           <p>
             Ask about a market, asset, setup, risk, or trading idea.
@@ -125,13 +164,10 @@ const analyzeMarket = async () => {
           </div>
 
           <div className="card">
-            <h3>📰 News</h3>
-            <p>
-  Live market data is connected.
-  <br />
-  News integration can be added later.
-</p>
-          </div>
+  <h3>📰 News</h3>
+  <p>Market headlines integration coming soon.</p>
+<p>AI analysis currently uses live market data.</p>
+</div>
 
           <div className="card">
             <h3>🛡️ Risk</h3>
@@ -158,17 +194,37 @@ const analyzeMarket = async () => {
           <div className="card">
             <h3>🧪 Stress Test</h3>
             <h4>Scenario Comparison</h4>
+            <p>
+  <strong>Stress Test Insight:</strong>{" "}
+  A 10% downside scenario would move the current price to{" "}
+  {market
+    ? `$${(Number(market.lastPrice) * 0.90).toFixed(2)}`
+    : "..."}.
+  This scenario helps assess how sensitive a potential setup may be
+  to adverse price movement.
+</p>
             {market ? (
   <div>
-    <p>Current: ${Number(market.lastPrice).toFixed(2)}</p>
-    <p>-5% Scenario: ${(Number(market.lastPrice) * 0.95).toFixed(2)}</p>
-    <p>+5% Scenario: ${(Number(market.lastPrice) * 1.05).toFixed(2)}</p>
-  </div>
+    <p>Current Price: ${Number(market.lastPrice).toFixed(2)}</p>
+<p>-10% Downside: ${(Number(market.lastPrice) * 0.90).toFixed(2)}</p>
+<p>-5% Downside: ${(Number(market.lastPrice) * 0.95).toFixed(2)}</p>
+<p>+5% Upside: ${(Number(market.lastPrice) * 1.05).toFixed(2)}</p>
+<p>+10% Upside: ${(Number(market.lastPrice) * 1.10).toFixed(2)}</p>
+<h4>Stress Test Summary</h4>
+<p>
+  {Math.abs(Number(market.price24hPcnt)) >= 0.05
+    ? "The market is showing a large 24-hour move. Wider downside and upside scenarios should be considered during stress testing."
+    : Math.abs(Number(market.price24hPcnt)) >= 0.02
+    ? "The market is showing a moderate 24-hour move. These scenarios help examine how the decision could behave under different price conditions."
+    : "The market is showing a relatively small 24-hour move. These scenarios provide a baseline for testing potential price changes."}
+</p>
+</div>
 ) : (
   <p>Waiting for market data...</p>
 )}
     
           </div>
+          
         </section>
       </main>
     </div>
