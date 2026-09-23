@@ -7,18 +7,17 @@ function App() {
   const [market, setMarket] = useState(null);
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [news, setNews] = useState([]);
-  const markets = [
-  "BTCUSDT",
-  "ETHUSDT",
-  "SOLUSDT",
-  "BNBUSDT",
-  "XRPUSDT",
-  "DOGEUSDT",
-  "ADAUSDT",
-  "AVAXUSDT",
-  "LINKUSDT",
-  "PEPEUSDT",
-];
+  const detectSymbol = (text) => {
+  const match = text.match(
+    /\b(?:ANALYZE|CHECK|REVIEW|LOOK AT)\s+([A-Z0-9]{2,15})(?:USDT)?\b/
+  );
+
+  if (!match) {
+    return symbol;
+  }
+
+  return `${match[1]}USDT`;
+};
   useEffect(() => {
   const loadMarket = async () => {
     try {
@@ -57,14 +56,11 @@ const analyzeMarket = async () => {
     return;
   }
 
-  const text = question.toUpperCase();
+ const text = question.toUpperCase();
 
-  const detectedSymbols = markets.filter((item) =>
-    text.includes(item.replace("USDT", ""))
-  );
+const detectedSymbol = detectSymbol(text);
 
-  const symbolsToFetch =
-    detectedSymbols.length > 0 ? detectedSymbols : [symbol];
+  const symbolsToFetch = [detectedSymbol];
 
   setSymbol(symbolsToFetch[0]);
   setAnalysis("AI is analyzing the live market data...");
@@ -151,7 +147,7 @@ const analyzeMarket = async () => {
         <button onClick={analyzeMarket}>
   Analyze Market
 </button> 
-{analysis && <p>{analysis}</p>} 
+{analysis && <p style={{ whiteSpace: "pre-wrap" }}>{analysis}</p>}
 
         </section>
 

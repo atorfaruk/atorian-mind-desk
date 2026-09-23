@@ -23,19 +23,20 @@ const fetchWithRetry = async (url, options) => {
       }
 
       await new Promise((resolve) =>
-        setTimeout(resolve, 1000 * attempt)
+        setTimeout(resolve,Math.min(7000, 2000 * 2 ** (attempt - 1)))
       );
     } catch (error) {
-      if (attempt === 3) {
-        throw error;
-      }
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 * attempt)
-      );
-    }
+  if (attempt === 3) {
+    throw error;
   }
-};
+
+  await new Promise((resolve) =>
+    setTimeout(resolve, Math.min(7000, 2000 * 2 ** (attempt - 1)))
+  );
+}
+}
+  }
+;
 app.get("/", (req, res) => {
   res.json({ message: "Bitget AI Trading Desk server is running." });
 });
@@ -63,7 +64,7 @@ app.post("/api/analyze", async (req, res) => {
 
   try {
     const response = await fetchWithRetry(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
       {
         method: "POST",
         headers: {
@@ -77,8 +78,7 @@ app.post("/api/analyze", async (req, res) => {
                 {
                   text: `You are an AI Trading Desk research assistant.
 Analyze the market information provided below.
-Give a concise, neutral research explanation.
-Do not give financial advice or tell the trader to buy or sell.
+Give a concise, neutral research explanation. Use plain text only. Do not use Markdown symbols such as ###, **, or bullet formatting. Organize the response with clear short section titles and line breaks.
 
 User question:
 ${question}
