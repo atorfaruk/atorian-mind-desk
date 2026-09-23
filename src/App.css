@@ -48,29 +48,52 @@ main {
 
 textarea {
   width: 100%;
-  min-height: 100px;
+  min-height: 110px;
   margin-top: 15px;
-  padding: 15px;
-  border-radius: 10px;
-  border: 1px solid #344250;
-  background: #0b0f14;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #26313d;
+  background: #0b1117;
   color: white;
+  font-size: 15px;
+  line-height: 1.5;
   resize: vertical;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+textarea:focus {
+  border-color: #20c997;
+  box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.12);
+}
+
+textarea::placeholder {
+  color: #7f8b96;
 }
 
 button {
   margin-top: 12px;
-  padding: 12px 22px;
+  padding: 13px 26px;
   border: none;
-  border-radius: 9px;
-  background: #16a36a;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #16a36a, #20c997);
   color: white;
-  font-weight: bold;
+  font-weight: 700;
+  font-size: 15px;
   cursor: pointer;
+  box-shadow: 0 6px 18px rgba(22, 163, 106, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 button:hover {
-  background: #128957;
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 9px 24px rgba(22, 163, 106, 0.35);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 .dashboard {
@@ -80,11 +103,19 @@ button:hover {
 }
 
 .card {
-  background: #111820;
+  background: linear-gradient(145deg, #111820, #0d141b);
   border: 1px solid #26313d;
   border-radius: 16px;
   padding: 25px;
   min-height: 150px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: #34495e;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .card h3 {
