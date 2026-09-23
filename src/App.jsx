@@ -161,8 +161,32 @@ const detectedSymbol = detectSymbol(text);
 
           <div className="card">
   <h3>📰 News</h3>
-  <p>Market headlines integration coming soon.</p>
-<p>AI analysis currently uses live market data.</p>
+
+  {news.length > 0 ? (
+    news.slice(0, 3).map((item, index) => (
+      <p key={index}>• {item.title || item}</p>
+    ))
+  ) : (
+    <>
+      <p>
+        • {symbol.replace("USDT", "")} market activity is being monitored
+        using live market data.
+      </p>
+
+      <p>
+        • 24h price movement:
+        {" "}
+        {market
+          ? `${(Number(market.price24hPcnt) * 100).toFixed(2)}%`
+          : "Loading..."}
+      </p>
+
+      <p>
+        • AI research context is based on the latest available market
+        conditions.
+      </p>
+    </>
+  )}
 </div>
 
           <div className="card">
