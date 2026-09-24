@@ -22,7 +22,7 @@ function App() {
   const loadMarket = async () => {
     try {
       const response = await fetch(
-        `https://api.bitget.com/api/v3/market/tickers?category=SPOT&symbol=${symbol}`
+        `/api/market?symbol=${symbol}`
         
       );
 
@@ -69,7 +69,7 @@ const detectedSymbol = detectSymbol(text);
     const marketResults = await Promise.all(
       symbolsToFetch.map(async (marketSymbol) => {
         const response = await fetch(
-          `https://api.bitget.com/api/v3/market/tickers?category=SPOT&symbol=${marketSymbol}`
+        `/api/market?symbol=${marketSymbol}`
         );
 
         const data = await response.json();
@@ -95,7 +95,7 @@ const detectedSymbol = detectSymbol(text);
           );
 
     const response = await fetch(
-      "http://localhost:3001/api/analyze",
+      "/api/analyze",
       {
         method: "POST",
         headers: {
