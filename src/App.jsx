@@ -1,10 +1,15 @@
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import "./App.css";
-
 function App() {
+  const analyzeController = useRef(null);
   const [question, setQuestion] = useState("");
   const [analysis, setAnalysis] = useState("");
+  const [signals, setSignals] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [market, setMarket] = useState(null);
+  const currentPrice = Number(
+  String(market?.last ?? market?.lastPr ?? market?.price ?? "0").replace(/[^0-9.-]/g, "")
+);
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [news, setNews] = useState([]);
   const detectSymbol = (text) => {
@@ -21,14 +26,18 @@ function App() {
   useEffect(() => {
   const loadMarket = async () => {
     try {
-      const response = await fetch(
-        `/api/market?symbol=${symbol}`
-        
-      );
+      const response = await fetch(`/api/market?symbol=${symbol}`);
 
       const data = await response.json();
 
-      setMarket(data.data[0]);
+      const ticker = data.data?.[0] || {};
+
+setMarket({
+  ...ticker,
+  price: Number(ticker.lastPrice),
+  change24h: Number(ticker.price24hPcnt) * 100,
+  reference: data.reference || null,
+});
     } catch (error) {
       console.error(error);
     }
@@ -49,9 +58,22 @@ useEffect(() => {
   };
 
   loadNews();
-}, []);
+}, []);const cancelAnalysis = () => {
+  if (analyzeController.current) {
+    analyzeController.current.abort();
+    analyzeController.current = null;
+    setAnalysis("Analysis cancelled.");
+  }
+};
 const analyzeMarket = async () => {
-  if (!question.trim()) {
+  if (analyzeController.current) {
+  analyzeController.current.abort();
+}
+
+const controller = new AbortController();
+analyzeController.current = controller;
+setIsAnalyzing(true);
+if (!question.trim()) {
     setAnalysis("Please enter a market question first.");
     return;
   }
@@ -74,10 +96,10 @@ const detectedSymbol = detectSymbol(text);
 
         const data = await response.json();
 
-        return {
-          symbol: marketSymbol,
-          data: data.data[0],
-        };
+       return {
+  symbol: marketSymbol,
+  data: data.data[0] || data.reference,
+};
       })
     );
 
@@ -101,6 +123,7 @@ const detectedSymbol = detectSymbol(text);
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal,
         body: JSON.stringify({
           question,
           market: marketContext,
@@ -115,10 +138,18 @@ const detectedSymbol = detectSymbol(text);
     }
 
     setAnalysis(data.analysis);
+    setSignals(data.signals);
   } catch (error) {
-    console.error(error);
-    setAnalysis("Unable to connect to the AI Trading Desk.");
+  if (error.name === "AbortError") {
+    setAnalysis("Analysis cancelled.");
+    return;
   }
+
+  console.error(error);
+  setAnalysis("Unable to connect to the AI Trading Desk.");
+}finally {
+  setIsAnalyzing(false);
+}
 };
 
   
@@ -144,19 +175,22 @@ const detectedSymbol = detectSymbol(text);
             onChange={(e) => setQuestion(e.target.value)}
           />
 
-        <button onClick={analyzeMarket}>
-  Analyze Market
-</button> 
+        <button onClick={isAnalyzing ? cancelAnalysis : analyzeMarket}>
+  {isAnalyzing ? "Stop Analysis" : "Analyze Market"}
+</button>
 {analysis && <p style={{ whiteSpace: "pre-wrap" }}>{analysis}</p>}
 
         </section>
 
         <section className="dashboard">
           <div className="card">
-            <h3>📈 Market</h3>
-            <p>{market?.symbol ? market.symbol.replace("USDT", "/USDT") : "Loading..."}</p>
-<p>Price: ${market?.lastPrice || "Loading..."}</p>
-<p>24h Change: {market ? `${(Number(market.price24hPcnt) * 100).toFixed(2)}%` : "Loading..."}</p>
+            <h3>📈 Market</h3><p>
+  {market?.symbol
+    ? market.symbol.replace(/USDT$/, "/USDT")
+    : "BTC/USDT"}
+</p>
+  <p>Price: ${market?.last ?? market?.lastPr ?? market?.price ?? "Loading..."}</p>
+<p>24h Change: {market ? `${Number(market.change24h).toFixed(2)}%` : "Loading..."}</p>
           </div>
 
           <div className="card">
@@ -166,16 +200,24 @@ const detectedSymbol = detectSymbol(text);
 </p>
 
 <p>
-  • 24h price movement:{" "}
-  {market
-    ? `${(Number(market.price24hPcnt) * 100).toFixed(2)}%`
-    : "Loading..."}
+  {market?.change24h != null
+  ? `${Number(market.change24h).toFixed(2)}%`
+  : "Loading..."}
 </p>
 
 <p>
   • AI research context is based on the latest available market conditions.
 </p>
-  
+  {signals && (
+  <div>
+    <p>• Market Signal: {signals.marketSignal}</p>
+    <p>• Momentum: {signals.momentum}</p>
+    <p>• Key Catalyst: {signals.keyCatalyst}</p>
+    <p>• Key Risk: {signals.keyRisk}</p>
+    <p>• Confidence: {signals.confidence}</p>
+    <p>• What to Watch: {signals.whatToWatch}</p>
+  </div>
+)}
 </div>
 
           <div className="card">
@@ -183,7 +225,7 @@ const detectedSymbol = detectSymbol(text);
             <p>
   {market ? (
   <>
-    24h Movement: {(Number(market.price24hPcnt) * 100).toFixed(2)}%
+    24h Movement: {Number(market.change24h).toFixed(2)}%
     <br />
     Volatility:{" "}
     {Math.abs(Number(market.price24hPcnt)) >= 0.05
@@ -203,23 +245,33 @@ const detectedSymbol = detectSymbol(text);
           <div className="card">
             <h3>🧪 Stress Test</h3>
             <h4>Scenario Comparison</h4>
-            <p>
+          
   <strong>Stress Test Insight:</strong>{" "}
   A 10% downside scenario would move the current price to{" "}
-  {market
-    ? `$${(Number(market.lastPrice) * 0.90).toFixed(2)}`
-    : "..."}.
-  This scenario helps assess how sensitive a potential setup may be
-  to adverse price movement.
-</p>
-            {market ? (
+ {market ? (
   <div>
-    <p>Current Price: ${Number(market.lastPrice).toFixed(2)}</p>
-<p>-10% Downside: ${(Number(market.lastPrice) * 0.90).toFixed(2)}</p>
-<p>-5% Downside: ${(Number(market.lastPrice) * 0.95).toFixed(2)}</p>
-<p>+5% Upside: ${(Number(market.lastPrice) * 1.05).toFixed(2)}</p>
-<p>+10% Upside: ${(Number(market.lastPrice) * 1.10).toFixed(2)}</p>
-<h4>Stress Test Summary</h4>
+  
+   <p>
+  Current Price: ${currentPrice.toFixed(2)}
+</p>
+
+<p>
+  -10% Downside: ${(currentPrice * 0.90).toFixed(2)}
+</p>
+
+<p>
+  -5% Downside: ${(currentPrice * 0.95).toFixed(2)}
+</p>
+
+<p>
+  +5% Upside: ${(currentPrice * 1.05).toFixed(2)}
+</p>
+
+<p>
+  +10% Upside: ${(currentPrice * 1.10).toFixed(2)}
+</p>
+
+    <h4>Stress Test Summary</h4>
 <p>
   {Math.abs(Number(market.price24hPcnt)) >= 0.05
     ? "The market is showing a large 24-hour move. Wider downside and upside scenarios should be considered during stress testing."
