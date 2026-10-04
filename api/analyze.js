@@ -7,33 +7,16 @@ export default async function handler(req, res) {
 
   const { question, market } = req.body;
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+ const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({
-      error: "GEMINI_API_KEY is not configured.",
-    });
-  }
-
-  try {
-    let response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are an AI Trading Desk research assistant.
-
-Analyze the live market information and the user's research question.
-
-Your job is to extract useful RESEARCH SIGNALS, not to make an automatic trading decision.
+if (!GROQ_API_KEY && !GEMINI_API_KEY) {
+  return res.status(500).json({
+    error: "No AI provider is configured.",
+  });
+}
+  const buildPrompt = () => `
+You are an AI Trading Desk research assistant.
 
 Return ONLY valid JSON. Do not use markdown or code fences.
 
@@ -47,7 +30,7 @@ Use exactly this structure:
     "keyCatalyst": "The most important observable factor.",
     "keyRisk": "The most important risk factor.",
     "confidence": "High, Medium, or Low",
-    "whatToWatch": "The most important thing the trader should monitor next."
+    "whatToWatch": "The most important thing to monitor next."
   }
 }
 
@@ -64,59 +47,159 @@ ${question}
 
 Live market data:
 ${JSON.stringify(market)}
-`,
+`;
+
+  const parseAIResult = (rawText) => {
+    if (!rawText) {
+      throw new Error("AI returned an empty response.");
+    }
+
+    const cleaned = rawText
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+
+    return JSON.parse(cleaned);
+  };
+
+  try {
+    let result = null;
+    let provider = "Groq";
+
+    // 1. Try Groq first
+    if (GROQ_API_KEY) {
+      try {
+        const groqResponse = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-oss-20b",
+              response_format: {
+                type: "json_object",
+              },
+              messages: [
+                {
+                  role: "system",
+                  content: buildPrompt(),
+                },
+              ],
+            }),
+          }
+        );
+
+        const groqData = await groqResponse.json();
+
+        if (groqResponse.ok) {
+          const rawText =
+            groqData?.choices?.[0]?.message?.content || "";
+
+          if (rawText) {
+            result = parseAIResult(rawText);
+          }
+        }
+
+        if (!result) {
+          console.log(
+            "Groq unavailable. Switching to Gemini fallback."
+          );
+        }
+      } catch (groqError) {
+        console.log(
+          "Groq failed. Switching to Gemini fallback:",
+          groqError.message
+        );
+      }
+    }
+
+    // 2. Gemini fallback
+    if (!result && GEMINI_API_KEY) {
+      provider = "Gemini";
+
+      const geminiResponse = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" +
+          encodeURIComponent(GEMINI_API_KEY),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                {
+                  text: buildPrompt(),
                 },
               ],
             },
-          ],
-        }),
+            generationConfig: {
+              responseMimeType: "application/json",
+            },
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: buildPrompt(),
+                  },
+                ],
+              },
+            ],
+          }),
+        }
+      );
+
+      const geminiData = await geminiResponse.json();
+
+      if (!geminiResponse.ok) {
+        return res.status(geminiResponse.status).json({
+          error:
+            geminiData?.error?.message ||
+            "Both AI providers failed.",
+        });
       }
-    );
 
-    const data = await response.json();
+      const rawText =
+        geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    console.log("Gemini response:", JSON.stringify(data, null, 2));
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error:
-          data?.error?.message || "Gemini API request failed.",
-      });
+      result = parseAIResult(rawText);
     }
 
-    const rawText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    let result;
-
-    try {
-      result = JSON.parse(rawText);
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.error("Raw Gemini output:", rawText);
-
-      return res.status(500).json({
-        error: "AI returned an invalid research format.",
+    if (!result) {
+      return res.status(503).json({
+        error: "No AI provider returned a usable analysis.",
       });
     }
 
     return res.status(200).json({
-      analysis: result.analysis || "No AI analysis was returned.",
+      analysis:
+        result.analysis ||
+        "No AI analysis was returned.",
       signals: {
-        marketSignal: result.signals?.marketSignal || "Neutral",
-        momentum: result.signals?.momentum || "Mixed",
+        marketSignal:
+          result.signals?.marketSignal || "Neutral",
+        momentum:
+          result.signals?.momentum || "Mixed",
         keyCatalyst:
-          result.signals?.keyCatalyst || "No clear catalyst identified.",
+          result.signals?.keyCatalyst ||
+          "No clear catalyst identified.",
         keyRisk:
-          result.signals?.keyRisk || "No clear risk identified.",
-        confidence: result.signals?.confidence || "Low",
+          result.signals?.keyRisk ||
+          "No clear risk identified.",
+        confidence:
+          result.signals?.confidence || "Low",
         whatToWatch:
           result.signals?.whatToWatch ||
           "Continue monitoring market conditions.",
       },
+      provider,
     });
   } catch (error) {
-    console.error("Gemini error:", error);
+    console.error("AI analysis error:", error);
 
     return res.status(500).json({
       error: "Unable to generate AI analysis.",
