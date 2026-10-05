@@ -64,7 +64,7 @@ ${JSON.stringify(market)}
 
   try {
     let result = null;
-    let provider = "Groq";
+    let provider = "Gemini";
 
     // 1. Try Groq first
     if (GROQ_API_KEY) {
