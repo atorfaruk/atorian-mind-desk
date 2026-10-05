@@ -9,8 +9,8 @@ export default async function handler(req, res) {
 
  const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-if (!GROQ_API_KEY && !GEMINI_API_KEY) {
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+if (!GROQ_API_KEY && !GEMINI_API_KEY && !OPENROUTER_API_KEY) {
   return res.status(500).json({
     error: "No AI provider is configured.",
   });
@@ -115,8 +115,57 @@ ${JSON.stringify(market)}
         );
       }
     }
+// 2. OpenRouter fallback
+if (!result && OPENROUTER_API_KEY) {
+  try {
+    provider = "OpenRouter";
 
-    // 2. Gemini fallback
+    const openRouterResponse = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "openrouter/auto",
+          messages: [
+            {
+              role: "system",
+              content: buildPrompt(),
+            },
+          ],
+          response_format: {
+            type: "json_object",
+          },
+        }),
+      }
+    );
+
+    const openRouterData = await openRouterResponse.json();
+
+    if (openRouterResponse.ok) {
+      const rawText =
+        openRouterData?.choices?.[0]?.message?.content || "";
+
+      if (rawText) {
+        result = parseAIResult(rawText);
+      }
+    } else {
+      console.log(
+        "OpenRouter failed:",
+        openRouterData?.error?.message || "Unknown error"
+      );
+    }
+  } catch (openRouterError) {
+    console.log(
+      "OpenRouter failed:",
+      openRouterError.message
+    );
+  }
+}
+    // 3. Gemini fallback
     if (!result && GEMINI_API_KEY) {
       provider = "Gemini";
 
